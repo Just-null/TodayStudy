@@ -4,13 +4,13 @@ import re
 import uuid
 from pyDes import PAD_PKCS5, des, CBC
 from requests_toolbelt import MultipartEncoder
-
+from actions.rlMessage import RlMessage
 from todayLoginService import TodayLoginService
 
 
 class Collection:
     # 初始化信息收集类
-    def __init__(self, todaLoginService: TodayLoginService, userInfo):
+    def __init__(self, todaLoginService: TodayLoginService, userInfo,sendkey):
         self.session = todaLoginService.session
         self.host = todaLoginService.host
         self.userInfo = userInfo
@@ -18,6 +18,7 @@ class Collection:
         self.collectWid = None
         self.formWid = None
         self.schoolTaskWid = None
+        self.rl = RlMessage(sendkey)
 
     # 查询表单
     def queryForm(self):
@@ -28,10 +29,16 @@ class Collection:
             'pageSize': 20,
             "pageNumber": 1
         }
+
         res = self.session.post(queryUrl, data=json.dumps(params), headers=headers, verify=False)
+
+
         res = res.json()
+
+        print(res['datas']['totalSize'])
         if res['datas']['totalSize'] < 1:
-            raise Exception('查询表单失败，请确认你是信息收集并且当前有收集任务。确定请联系开发者')
+            self.rl.send("失败","查询表单失败，请确认当前是否有收集任务")
+            raise Exception('查询表单失败，请确认当前是否有收集任务')
         self.collectWid = res['datas']['rows'][0]['wid']
         self.formWid = res['datas']['rows'][0]['formWid']
         detailUrl = f'{self.host}wec-counselor-collector-apps/stu/collector/detailCollector'
@@ -50,7 +57,6 @@ class Collection:
                                 data=json.dumps({'fileType': 1}),
                                 verify=False)
         datas = res.json().get('datas')
-        print(datas)
         fileName = datas.get('fileName')
         policy = datas.get('policy')
         accessKeyId = datas.get('accessid')
@@ -89,10 +95,13 @@ class Collection:
             # 只处理必填项
             if formItem['isRequired']:
                 userForm = self.userInfo['forms'][index]['form']
+
                 # 判断用户是否需要检查标题
                 if self.userInfo['checkTitle'] == 1:
                     # 如果检查到标题不相等
                     if formItem['title'].strip() != userForm['title'].strip():
+
+                        self.rl.send("失败", "第"+{index + 1}+"个配置项的标题不正确\r\n您的标题为:"+{userForm["title"]}+"\r\n系统的标题为："+{formItem["title"]})
                         raise Exception(
                             f'\r\n第{index + 1}个配置项的标题不正确\r\n您的标题为：{userForm["title"]}\r\n系统的标题为：{formItem["title"]}')
                 # 填充多出来的参数（新版增加了三个参数，暂时不知道作用）
@@ -121,11 +130,14 @@ class Collection:
                             if fieldItem['isOtherItems'] and fieldItem['otherItemType'] == '1':
                                 # 当配置文件中不存在other字段时抛出异常
                                 if 'other' not in userForm:
+                                    self.rl.send("失败", "第" + {index + 1} + "个配置项的选项不正确，该字段存在“other”字段，请在配置文件“title，value”下添加一行“other”字段并且填上对应的值")
                                     raise Exception(
                                         f'\r\n第{index + 1}个配置项的选项不正确，该字段存在“other”字段，请在配置文件“title，value”下添加一行“other”字段并且填上对应的值'
                                     )
                                 fieldItem['contentExtend'] = userForm['other']
                     if itemWid == '':
+                        self.rl.send("失败", "第" + {
+                            index + 1} + "个配置项的选项不正确，该选项为单选，且未找到您配置的值\r\n您上次的选值为："+{ preSelect })
                         raise Exception(
                             f'\r\n第{index + 1}个配置项的选项不正确，该选项为单选，且未找到您配置的值\r\n您上次的选值为：{ preSelect }'
                         )
@@ -157,36 +169,6 @@ class Collection:
                             f'\r\n第{index + 1}个配置项的选项不正确，该选项为多选，且未找到您配置的值\r\n您上次的选值为：{ preSelect }'
                         )
                     formItem['value'] = ','.join(itemWidArr)
-                # 图片（健康码）上传类型
-                elif formItem['fieldType'] == '4':
-                    # 如果是传图片的话，那么是将图片的地址（相对/绝对都行）存放于此value中
-                    self.uploadPicture(userForm['value'])
-                    formItem['value'] = self.getPictureUrl()
-                    # 填充其他信息
-                    formItem.setdefault('http', {
-                        'defaultOptions': {
-                            'customConfig': {
-                                'pageNumberKey': 'pageNumber',
-                                'pageSizeKey': 'pageSize',
-                                'pageDataKey': 'pageData',
-                                'pageTotalKey': 'pageTotal',
-                                'data': 'datas',
-                                'codeKey': 'code',
-                                'messageKey': 'message'
-                            }
-                        }
-                    })
-                    # formItem['http']['defaultOptions']['customConfig']['pageNumberKey'] = 'pageNumber'
-                    # formItem['http']['defaultOptions']['customConfig']['pageSizeKey'] = 'pageSize'
-                    # formItem['http']['defaultOptions']['customConfig']['pageDataKey'] = 'pageData'
-                    # formItem['http']['defaultOptions']['customConfig']['pageTotalKey'] = 'pageTotal'
-                    # formItem['http']['defaultOptions']['customConfig']['data'] = 'datas'
-                    # formItem['http']['defaultOptions']['customConfig']['codeKey'] = 'code'
-                    # formItem['http']['defaultOptions']['customConfig']['messageKey'] = 'message'
-                    formItem['uploadPolicyUrl'] = '/wec-counselor-collector-apps/stu/oss/getUploadPolicy'
-                    formItem['saveAttachmentUrl'] = '/wec-counselor-collector-apps/stu/collector/saveAttachment'
-                    formItem['previewAttachmentUrl'] = '/wec-counselor-collector-apps/stu/collector/previewAttachment'
-                    formItem['downloadMediaUrl'] = '/wec-counselor-collector-apps/stu/collector/downloadMedia'
                 else:
                     raise Exception(
                         f'\r\n第{index + 1}个配置项属于未知配置项，请反馈'
