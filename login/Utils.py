@@ -3,7 +3,8 @@ import json
 import random
 from datetime import datetime, timezone, timedelta
 from io import BytesIO
-
+import rsa
+import urllib.parse
 import yaml
 from Crypto.Cipher import AES
 from tencentcloud.common import credential
@@ -17,6 +18,12 @@ class Utils:
     def __init__(self):
         pass
 
+    # 获取当前utc时间，并格式化为北京时间
+    @staticmethod
+    def getTimeStr():
+        utc_dt = datetime.utcnow().replace(tzinfo=timezone.utc)
+        bj_dt = utc_dt.astimezone(timezone(timedelta(hours=8)))
+        return bj_dt.strftime("%Y-%m-%d %H:%M:%S")
     # 获取当前北京时间
     @staticmethod
     def getAsiaTime():
@@ -51,6 +58,7 @@ class Utils:
     # aes加密的实现
     @staticmethod
     def encryptAES(password, key):
+        print("000000")
         randStrLen = 64
         randIvLen = 16
         ranStr = Utils.randString(randStrLen)
@@ -68,6 +76,7 @@ class Utils:
         text = aes.encrypt(bytes(data, encoding='utf-8'))
         text = base64.encodebytes(text)
         text = text.decode('utf-8').strip()
+
         return text
 
     # 通过url解析图片验证码
@@ -97,6 +106,7 @@ class Utils:
             for item in codeArray:
                 code += item['DetectedText'].replace(' ', '')
             if len(code) == 4:
+                print(code)
                 return code
             else:
                 return Utils.getCodeFromImg(res, imgUrl)

@@ -1,11 +1,8 @@
 import re
-from urllib.parse import urlparse
-
 import requests
 from urllib3.exceptions import InsecureRequestWarning
+from actions.rlMessage import RlMessage
 
-from login.casLogin import casLogin
-from login.iapLogin import iapLogin
 from login.kmuLogin import kmuLogin
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -13,7 +10,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 class TodayLoginService:
     # 初始化本地登录类
-    def __init__(self, userInfo):
+    def __init__(self, userInfo,sendkey):
         if None == userInfo['username'] or '' == userInfo['username'] or None == userInfo['password'] or '' == userInfo[
             'password'] or None == userInfo['schoolName'] or '' == userInfo['schoolName']:
             raise Exception('初始化类失败，请键入完整的参数（用户名，密码，学校名称）')
@@ -29,7 +26,8 @@ class TodayLoginService:
         self.host = ''
         self.login_host = ''
         self.loginEntity = None
-
+        self.rl = RlMessage(sendkey)
+        self.sendkey = sendkey
     # 通过学校名称借助api获取学校的登陆url
     def getLoginUrlBySchoolName(self):
         schools = self.session.get('https://mobile.campushoy.com/v6/config/guest/tenant/list', verify=False).json()[
@@ -38,6 +36,7 @@ class TodayLoginService:
         for item in schools:
             if item['name'] == self.schoolName:
                 if item['joinType'] == 'NONE':
+                    self.rl.send("失败","未加入今日校园，请检查...")
                     raise Exception(self.schoolName + '未加入今日校园，请检查...')
                 flag = False
                 params = {
@@ -68,14 +67,9 @@ class TodayLoginService:
 
     # 通过登陆url判断采用哪种登陆方式
     def checkLogin(self):
-        if self.login_url.find('/iap') != -1:
-            self.loginEntity = iapLogin(self.username, self.password, self.login_url, self.login_host, self.session)
-        elif self.login_url.find('kmu.edu.cn') != -1:
-            self.loginEntity = kmuLogin(self.username, self.password, self.login_url, self.login_host, self.session)
-        else:
-            self.loginEntity = casLogin(self.username, self.password, self.login_url, self.login_host, self.session)
-        # 统一登录流程
+        self.loginEntity = kmuLogin(self.username, self.password, self.login_url, self.login_host, self.session,self.sendkey)
         self.session.cookies = self.loginEntity.login()
+
 
     # 本地化登陆
     def login(self):
