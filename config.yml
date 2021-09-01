@@ -15,25 +15,25 @@ users:
       #school 学校全称
       schoolName: 昆明学院
       #username 学号或者工号
-      username: '181107410009'
+      username: ''
       #password 密码
-      password: 'wxz2015111zc@srb'
+      password: ''
       # 地址信息
-      address: '云南省昆明市五华区普吉街道普吉路'
+      address: '云南省昆明市五华区普吉路'
       #sendKey 当sendType为0时代表邮箱，当sendType为1时代表接收消息的QQ号码
-      sendKey: 'SCT69864T2jzKuQxXOpbCwm8z1uPeG5PM'
+      sendKey: ''
       # 附上经纬度查询地址（请自行选择自己的学校地址，address，lon，lat都要填查询到的）：http://api.map.baidu.com/lbsapi/getpoint/index.html
       #lon 经度
-      lon: 102.83944512
+      lon: 102.680877
       #lat 纬度
-      lat: 24.88627211
+      lat: 25.076813
       checkTitle: 1
 
       # 表单信息
       forms:
         - form:
             title: 今天你的所在地是？
-            value: 云南省/昆明市/五华区
+            value: xx省/xx市/xx区
         - form:
             title: 今天你的体温是多少？
             value: 37.2℃及以下
